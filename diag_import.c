@@ -8,6 +8,7 @@
 #include "bit_func.h"
 #include "session.h"
 #include <stdlib.h>
+#include <termios.h>
 
 void process_file(char *infile_name, int do_init);
 
@@ -137,6 +138,43 @@ process_file(char *infile_name, int do_init)
 	} else
 	{
 		infile = fopen(infile_name, "rb+");
+		int fd = fileno(infile);
+		if(fd > 0 && isatty(fd) )
+		{
+			/* Setup termios */
+			struct termios tios;
+			memset(&tios, 0, sizeof(struct termios));
+			errno = 0;
+			if (tcgetattr(fd, &tios) == 0)
+			{
+				tios.c_cflag &= ~(CBAUD | CSIZE | CSTOPB | PARENB | PARODD | CRTSCTS);
+				tios.c_iflag &= ~(IGNCR | ICRNL | IUCLC | INPCK | IXON | IXOFF | IXANY );
+				tios.c_oflag &= ~(OPOST | OLCUC | OCRNL | ONLCR | ONLRET);
+				tios.c_lflag &= ~(ICANON | ECHO | ECHOE | ECHONL);
+
+				tios.c_cc[VMIN] = 1;
+				tios.c_cc[VTIME] = 0;
+				tios.c_cc[VEOF] = 1;
+
+				/* Ignore parity/framing errors */
+				tios.c_iflag |= IGNPAR;
+
+				/* No parity bit, 1 stop bit, 8 data bits */
+				tios.c_cflag |= (CS8 | CLOCAL | CREAD);
+
+				cfsetispeed (&tios, B57600);
+				cfsetospeed (&tios, B57600);
+
+				if(tcsetattr(fd, TCSANOW, &tios) != 0)
+				{
+					warn("tcsetattr failed on file %s", infile_name);
+				}
+			}
+			else
+			{
+				warn("tcgetattr failed on file %s", infile_name);
+			}
+		}
 	}
 
 	if (!infile)
