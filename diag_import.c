@@ -183,7 +183,10 @@ process_file(char *infile_name, int do_init)
 	}
 
 	if (do_init)
-		diag_set_log(infile);
+	{
+		diag_start_log(infile);
+	}
+
 	diag_set_filename(infile_name);
 
 	for (;;) {
@@ -200,5 +203,11 @@ process_file(char *infile_name, int do_init)
 
 		handle_diag(msg, len);
 	}
+
+	if (do_init)
+	{
+		diag_stop_log(infile);
+	}
+
 	fclose(infile);
 }
