@@ -9,8 +9,9 @@
 #include "session.h"
 #include <stdlib.h>
 #include <termios.h>
+#include <time.h>
 
-void process_file(char *infile_name, int do_init);
+void process_file(char *infile_name, int do_init, time_t max_capture_time);
 
 static void usage(const char *progname, const char *reason)
 {
@@ -21,12 +22,12 @@ static void usage(const char *progname, const char *reason)
 	printf("	-f <filelist> - Read list of input files from <filelist>\n");
 	printf("	-i            - Initialize device\n");
 	printf("	-v            - Verbose messages\n");
+	printf("	-G <seconds>  - Maximum capture time\n");
 	printf("	[filenames]   - Read DIAG data from [filenames]\n");
 	exit(1);
 }
 
-static void
-chop_newline(char *line)
+static void chop_newline(char *line)
 {
 	int newline_pos = strlen(line) - 1;
 	if (newline_pos >= 0 && line[newline_pos] == '\n')
@@ -48,10 +49,11 @@ int main(int argc, char *argv[])
 	long cid = 0;
 	int line = 0;
 	int init = 0;
+	time_t max_capture_time = 0;
 
 	msg_verbose = 0;
 
-	while ((ch = getopt(argc, argv, "p:g:f:vi")) != -1) {
+	while ((ch = getopt(argc, argv, "p:g:f:viC:G:")) != -1) {
 		switch (ch) {
 			case 'g':
 				gsmtap_target = strdup(optarg);
@@ -67,6 +69,9 @@ int main(int argc, char *argv[])
 				break;
 			case 'v':
 				msg_verbose++;
+				break;
+			case 'G':
+				max_capture_time = strtol(optarg, NULL, 0);
 				break;
 			case '?':
 			default:
@@ -90,7 +95,7 @@ int main(int argc, char *argv[])
 	//  Handle files passed to command line first
 	while (argc > 0)
 	{
-		process_file(argv[0], init);
+		process_file(argv[0], init, max_capture_time);
 		argc--;
 		argv++;
 	};
@@ -114,7 +119,7 @@ int main(int argc, char *argv[])
 			}
 			if (ret) {
 				chop_newline(infile_name);
-				process_file(infile_name, init);
+				process_file(infile_name, init, 0);
 			}
 		}
 		fclose(filelist);
@@ -125,22 +130,42 @@ int main(int argc, char *argv[])
 	return 0;
 }
 
-void
-process_file(char *infile_name, int do_init)
+static time_t get_time_monotonic()
+{
+	struct timespec time;
+	clock_gettime(CLOCK_MONOTONIC, &time);
+	return time.tv_sec;
+}
+
+void process_file(char *infile_name, int do_init, time_t max_capture_time)
 {
 	uint8_t msg[4096];
 	FILE *infile = NULL;
 	unsigned len = 0;
+	time_t timeout_time = 0;
+
+	if(max_capture_time > 0)
+	{
+		timeout_time = get_time_monotonic() + max_capture_time;
+	}
 
 	if (strcmp(infile_name, "-") == 0)
 	{
 		infile = stdin;
-	} else
+	}
+	else
 	{
 		infile = fopen(infile_name, "rb+");
-		int fd = fileno(infile);
+		if(!infile)
+		{
+			warn("File not found: %s", infile_name);
+			return;
+		}
+		int fd = 0;
+		fd = fileno(infile);
 		if(fd > 0 && isatty(fd) )
 		{
+			printf("Setting up tty...\n");
 			/* Setup termios */
 			struct termios tios;
 			memset(&tios, 0, sizeof(struct termios));
@@ -192,7 +217,17 @@ process_file(char *infile_name, int do_init)
 	for (;;) {
 		len = fread_unescape(infile, msg, sizeof(msg));
 
-		if (len < 1) {
+		if (timeout_time > 0 &&
+		    timeout_time <= get_time_monotonic())
+		{
+			printf("Maximum capture time reached\n");
+			fflush(stdout);
+			break;
+		}
+
+		if(len < 1 && feof(infile))
+		{
+			printf("Got End of File indication\n");
 			break;
 		}
 
@@ -208,6 +243,5 @@ process_file(char *infile_name, int do_init)
 	{
 		diag_stop_log(infile);
 	}
-
 	fclose(infile);
 }
