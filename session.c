@@ -12,7 +12,7 @@
 #define APPEND(log, msg) snprintf(log+strlen(log), sizeof(log)-strlen(log), "%s", msg);
 
 #ifndef MSG_VERBOSE
-#define MSG_VERBOSE 0
+#define MSG_VERBOSE 3
 #endif /* !MSG_VERBOSE */
 
 uint8_t privacy = 0;
@@ -78,7 +78,7 @@ struct session_info *session_create(int id, char* name, uint8_t *key, int mcc, i
 	memset(ns, 0, sizeof(struct session_info));
 
 	if (id < 0) {
-		ns->id = s_id++; 
+		ns->id = s_id++;
 	} else {
 		ns->id = id;
 	}
@@ -273,7 +273,7 @@ void session_reset(struct session_info *s, int forced_release)
 	/* Copy information for repeated message detection */
 	if (old_s.last_dtap_len) {
 		s->last_dtap_len = old_s.last_dtap_len;
-		memcpy(s->last_dtap, old_s.last_dtap, old_s.last_dtap_len); 
+		memcpy(s->last_dtap, old_s.last_dtap, old_s.last_dtap_len);
 		s->last_dtap_rat = old_s.last_dtap_rat;
 	}
 

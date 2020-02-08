@@ -188,9 +188,9 @@ struct radio_message * handle_4G(struct diag_packet *dp, unsigned len)
 	struct radio_message *m;
 	uint8_t *data = NULL;
 
-	if (len < 16) {
-		return 0;
-	}
+	// if (len < 16) {
+	// 	return 0;
+	// }
 
 	payload_len = len - 7;
 	data = &dp->data[1];
@@ -209,6 +209,8 @@ struct radio_message * handle_4G(struct diag_packet *dp, unsigned len)
 		m->bb.arfcn[0] = ((uint16_t) dp->data[4]) << 8 | dp->data[3];
 		/* Qualcomm to wireshark conversion */
 		switch (dp->data[7]) {
+		case 0: // ???
+			break;
 		case 2:	// BCCH-DL-SCH
 			m->chan_nr = 5;
 			break;
@@ -232,9 +234,35 @@ struct radio_message * handle_4G(struct diag_packet *dp, unsigned len)
 			m->chan_nr = 3;
 			m->bb.arfcn[0] |= ARFCN_UPLINK;
 			break;
+		case 37:
+		case 41:
+		case 50:
+		case 57:
+		case 66:
+		case 69:
+		case 80:
+		case 88:
+		case 89:
+		case 100:
+		case 121:
+		case 134:
+		case 151:
+		case 153:
+		case 179:
+		case 188:
+		case 197:
+		case 201:
+		case 209:
+		case 211:
+		case 217:
+		case 249:
+			break;
 		default:
 			// Unhandled
-			return NULL;
+			if (msg_verbose > 1)
+			{
+				printf("Unhandled LTE RRC id: %d, len: %d\n", dp->data[7], payload_len);
+			}
 		}
 		payload_len=len-14;
 		data = &dp->data[14];
@@ -519,14 +547,14 @@ void handle_diag(uint8_t *msg, unsigned len)
 			_s[1].timestamp = _s[0].timestamp;
 		}
 		if (msg_verbose > 1) {
-			fprintf(stderr, "Class %04x is not supported\n", dp->msg_class);
+			fprintf(stderr, "Class %04x is not supported, len: %d\n", dp->msg_class, len);
 		}
 		return;
 	}
 
 	/* Avoid short messages */
-	if (len < 16)
-		return;
+	// if (len < 16)
+	// 	return;
 
 	now = get_epoch((uint8_t *) &dp->timestamp);
 
@@ -631,6 +659,9 @@ void handle_diag(uint8_t *msg, unsigned len)
 		break;
 
 	case 0xb0f3: // unknown LTE
+		if (msg_verbose > 1) {
+			fprintf(stderr, "Unknown LTE message 0xb0f3\n");
+		}
 		break;
 
 	default:

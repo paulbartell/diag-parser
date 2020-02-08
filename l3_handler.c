@@ -986,6 +986,9 @@ void handle_radio_msg(struct session_info *s, struct radio_message *m)
 		break;
 
 	default:
+		if (msg_verbose) {
+			printf("Unhandled RAT: %d\n", m->rat);
+		}
 		return;
 	}
 
@@ -1052,7 +1055,7 @@ unsigned encapsulate_lapdm(uint8_t *data, unsigned len, uint8_t ul, uint8_t sacc
 
 	/* Add default padding */
 	if (len + offset < alloc_len) {
-		memset(&lapdm[len + offset], 0x2b, alloc_len - (len + offset)); 
+		memset(&lapdm[len + offset], 0x2b, alloc_len - (len + offset));
 	}
 
 	return alloc_len;
